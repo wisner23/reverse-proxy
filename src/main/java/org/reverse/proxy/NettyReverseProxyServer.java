@@ -7,12 +7,19 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SniHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.websockets.core.WebSocketChannel;
+import io.undertow.websockets.core.protocol.Handshake;
+import io.undertow.websockets.spi.WebSocketHttpExchange;
+import org.xnio.StreamConnection;
 
 import javax.net.ssl.*;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.Socket;
 import java.security.*;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 
 public class NettyReverseProxyServer {
 
@@ -20,7 +27,6 @@ public class NettyReverseProxyServer {
         try{
             SSLEngine engine = NettyReverseProxyServer.getSSLContext().createSSLEngine();
             engine.setUseClientMode(false);
-
 
             ServerBootstrap bootstrap = new ServerBootstrap();
             bootstrap.group(new NioEventLoopGroup());
@@ -36,23 +42,23 @@ public class NettyReverseProxyServer {
             });
             bootstrap.bind(80);
         }
-        catch (NoSuchAlgorithmException ex){ ex.printStackTrace();}
-        catch (KeyManagementException ex){ ex.printStackTrace();}
+        catch(NoSuchAlgorithmException ex){ ex.printStackTrace();}
+        catch(KeyManagementException ex){ ex.printStackTrace();}
         catch(KeyStoreException ex){ex.printStackTrace();}
         catch(CertificateException ex){ex.printStackTrace();}
         catch(IOException ex){ex.printStackTrace();}
         catch(UnrecoverableKeyException ex){ex.printStackTrace();}
+        catch(Exception ex){ ex.printStackTrace();}
     }
 
-    public static SSLContext getSSLContext() throws NoSuchAlgorithmException,
+    public static SSLContext getSSLContext() throws NoSuchAlgorithmException, Exception,
             KeyStoreException, UnrecoverableKeyException, KeyManagementException, CertificateException, IOException {
 
         KeyStore keyStore = NettyReverseProxyServer.getKeyStore();
-
         SSLContext sslContext = SSLContext.getInstance("TLS");
 
-        sslContext.init(NettyReverseProxyServer.geKeyManagers(keyStore),
-                NettyReverseProxyServer.getTrustManagers(keyStore), null);
+        KeyManager[] keyManagers = NettyReverseProxyServer.geKeyManagers(keyStore);
+        sslContext.init( keyManagers,null, null);
 
         return sslContext;
     }
@@ -61,17 +67,28 @@ public class NettyReverseProxyServer {
             KeyStoreException, IOException {
 
         KeyStore keyStore = KeyStore.getInstance("JKS");
-        keyStore.load(new FileInputStream("src/main/resources/localdois"), "123456".toCharArray());
+        keyStore.load(new FileInputStream("src/main/resources/testkeystore.jks"), "123456".toCharArray());
 
         return keyStore;
     }
 
     public static KeyManager[] geKeyManagers(KeyStore keyStore) throws NoSuchAlgorithmException,
-            UnrecoverableKeyException, KeyStoreException {
-        KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        keyManager.init(keyStore, "123456".toCharArray());
+            UnrecoverableKeyException, KeyStoreException, Exception {
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyManagerFactory.init(keyStore, "123456".toCharArray());
 
-        return keyManager.getKeyManagers();
+        X509ExtendedKeyManager x509ExtendedKeyManager = null;
+        for(KeyManager keyManager : keyManagerFactory.getKeyManagers()){
+            if(keyManager instanceof X509ExtendedKeyManager){
+                x509ExtendedKeyManager = (X509ExtendedKeyManager)keyManager;
+            }
+        }
+
+        if (x509ExtendedKeyManager == null)
+            throw new Exception("KeyManagerFactory did not create an X509ExtendedKeyManager");
+
+        XKeyManager xKeyManager = new XKeyManager(x509ExtendedKeyManager);
+        return new KeyManager[]{xKeyManager};
     }
 
     public static TrustManager[] getTrustManagers(KeyStore keyStore) throws NoSuchAlgorithmException,
