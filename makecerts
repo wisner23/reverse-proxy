@@ -1,0 +1,5 @@
+# Create a Java KeyStore (JKS) with the version 3
+keytool -genkey -alias test.localdomain -keystore xkeystore.jks -storepass 123456 -validity 365 -keyalg RSA -keysize 2048 -storetype pkcs12 -ext SAN=dns:test.localdomain
+
+# Convert a JKS to a PKCS12 cert
+keytool -importkeystore -srckeystore xkeystore.jks -srcstoretype JKS -deststoretype PKCS12 -destkeystore xkeystore.p12
