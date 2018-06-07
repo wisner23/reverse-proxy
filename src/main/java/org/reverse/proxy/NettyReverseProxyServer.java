@@ -7,6 +7,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SniHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.undertow.connector.ByteBufferPool;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.protocol.Handshake;
@@ -25,7 +26,7 @@ public class NettyReverseProxyServer {
 
     public static void main(String[] args) {
         try{
-            SSLEngine engine = NettyReverseProxyServer.getSSLContext().createSSLEngine();
+            SSLEngine engine = getSSLContext().createSSLEngine();
             engine.setUseClientMode(false);
 
             ServerBootstrap bootstrap = new ServerBootstrap();
@@ -54,11 +55,11 @@ public class NettyReverseProxyServer {
     public static SSLContext getSSLContext() throws NoSuchAlgorithmException, Exception,
             KeyStoreException, UnrecoverableKeyException, KeyManagementException, CertificateException, IOException {
 
-        KeyStore keyStore = NettyReverseProxyServer.getKeyStore();
+        KeyStore keyStore = getKeyStore();
         SSLContext sslContext = SSLContext.getInstance("TLS");
 
-        KeyManager[] keyManagers = NettyReverseProxyServer.geKeyManagers(keyStore);
-        sslContext.init( keyManagers,null, null);
+        KeyManager[] keyManagers = geKeyManagers(keyStore);
+        sslContext.init(keyManagers, getTrustManagers(keyStore), null);
 
         return sslContext;
     }
@@ -67,7 +68,7 @@ public class NettyReverseProxyServer {
             KeyStoreException, IOException {
 
         KeyStore keyStore = KeyStore.getInstance("JKS");
-        keyStore.load(new FileInputStream("src/main/resources/testkeystore.jks"), "123456".toCharArray());
+        keyStore.load(new FileInputStream("src/main/resources/xkeystore.jks"), "123456".toCharArray());
 
         return keyStore;
     }
@@ -97,7 +98,16 @@ public class NettyReverseProxyServer {
                 .getInstance(TrustManagerFactory.getDefaultAlgorithm());
 
         trustManagerFactory.init(keyStore);
-        return trustManagerFactory.getTrustManagers();
+
+        X509ExtendedTrustManager x509ExtendedTrustManager = null;
+        for(TrustManager trustManager : trustManagerFactory.getTrustManagers()){
+            if(trustManager instanceof X509ExtendedTrustManager){
+                x509ExtendedTrustManager = (X509ExtendedTrustManager)trustManager;
+            }
+        }
+
+        XTrustManager xTrustManager = new XTrustManager(x509ExtendedTrustManager);
+        return new TrustManager[]{ xTrustManager };
     }
 
 }

@@ -26,9 +26,8 @@ public class XKeyManager extends X509ExtendedKeyManager {
             }
         }
 
-        if(getPrivateKey(hostname) != null){
+        if (hostname != null && (getCertificateChain(hostname) != null && getPrivateKey(hostname) != null))
             return hostname;
-        }
 
         return "test.example.com";
     }
