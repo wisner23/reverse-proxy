@@ -1,26 +1,17 @@
 package org.reverse.proxy;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.ssl.SniHandler;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import io.undertow.connector.ByteBufferPool;
-import io.undertow.websockets.core.WebSocketChannel;
-import io.undertow.websockets.core.protocol.Handshake;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
-import org.xnio.StreamConnection;
 
 import javax.net.ssl.*;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.Socket;
 import java.security.*;
 import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 
 public class NettyReverseProxyServer {
 
@@ -43,17 +34,10 @@ public class NettyReverseProxyServer {
             });
             bootstrap.bind(80);
         }
-        catch(NoSuchAlgorithmException ex){ ex.printStackTrace();}
-        catch(KeyManagementException ex){ ex.printStackTrace();}
-        catch(KeyStoreException ex){ex.printStackTrace();}
-        catch(CertificateException ex){ex.printStackTrace();}
-        catch(IOException ex){ex.printStackTrace();}
-        catch(UnrecoverableKeyException ex){ex.printStackTrace();}
         catch(Exception ex){ ex.printStackTrace();}
     }
 
-    public static SSLContext getSSLContext() throws NoSuchAlgorithmException, Exception,
-            KeyStoreException, UnrecoverableKeyException, KeyManagementException, CertificateException, IOException {
+    public static SSLContext getSSLContext() throws Exception {
 
         KeyStore keyStore = getKeyStore();
         SSLContext sslContext = SSLContext.getInstance("TLS");
@@ -73,8 +57,7 @@ public class NettyReverseProxyServer {
         return keyStore;
     }
 
-    public static KeyManager[] geKeyManagers(KeyStore keyStore) throws NoSuchAlgorithmException,
-            UnrecoverableKeyException, KeyStoreException, Exception {
+    public static KeyManager[] geKeyManagers(KeyStore keyStore) throws Exception {
         KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         keyManagerFactory.init(keyStore, "123456".toCharArray());
 
