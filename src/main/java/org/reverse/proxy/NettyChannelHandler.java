@@ -1,8 +1,9 @@
 package org.reverse.proxy;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
 
 
 public class NettyChannelHandler extends ChannelInboundHandlerAdapter{
@@ -14,7 +15,7 @@ public class NettyChannelHandler extends ChannelInboundHandlerAdapter{
         final Channel inboundChannel = ctx.channel();
 
         Bootstrap bootstrap = new Bootstrap();
-        bootstrap.group(inboundChannel.eventLoop());
+        bootstrap.group(new NioEventLoopGroup());
         bootstrap.channel(inboundChannel.getClass());
         bootstrap.handler(new NettyBackendChannelHandler(inboundChannel));
 
@@ -31,6 +32,13 @@ public class NettyChannelHandler extends ChannelInboundHandlerAdapter{
                 }
             }
         });
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        if(outboundChannel.isActive()){
+            ctx.channel().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+        }
     }
 
     @Override
