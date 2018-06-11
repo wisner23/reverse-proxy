@@ -28,4 +28,15 @@ public class NettyBackendChannelHandler extends ChannelInboundHandlerAdapter {
             }
         });
     }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        NettyChannelHandler.closeOnFlush(ctx.channel());
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
+        NettyChannelHandler.closeOnFlush(ctx.channel());
+    }
 }

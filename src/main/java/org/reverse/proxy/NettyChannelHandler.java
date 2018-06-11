@@ -35,13 +35,6 @@ public class NettyChannelHandler extends ChannelInboundHandlerAdapter{
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        if(outboundChannel.isActive()){
-            ctx.channel().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-        }
-    }
-
-    @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg){
 
         if(outboundChannel.isActive()){
@@ -58,4 +51,20 @@ public class NettyChannelHandler extends ChannelInboundHandlerAdapter{
         }
     }
 
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        if(outboundChannel.isActive()){
+            closeOnFlush(ctx.channel());
+        }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
+        closeOnFlush(ctx.channel());
+    }
+
+    public static void closeOnFlush(Channel ch){
+        ch.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+    }
 }
