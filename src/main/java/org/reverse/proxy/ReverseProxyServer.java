@@ -1,11 +1,13 @@
 package org.reverse.proxy;
 
 import io.undertow.Undertow;
-import io.undertow.util.Headers;
+import io.undertow.server.handlers.proxy.LoadBalancingProxyClient;
+import io.undertow.server.handlers.proxy.ProxyHandler;
 
 import javax.net.ssl.*;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.security.*;
 import java.security.cert.CertificateException;
 
@@ -19,32 +21,28 @@ public class ReverseProxyServer {
             KeyStore keyStore = ReverseProxyServer.getKeyStore();
 
             sslContext.init(ReverseProxyServer.getKeyManager(keyStore),
-                    ReverseProxyServer.getTrustManagers(null), null);
+                    null, null);
+
+            LoadBalancingProxyClient loadBalancer  = new LoadBalancingProxyClient();
+            loadBalancer.addHost(new URI("http://localhost:8030"));
+            loadBalancer.setConnectionsPerThread(20);
 
             Undertow server = Undertow
                     .builder()
-                    .addHttpsListener(9030,"0.0.0.0", sslContext)
-                    .setHandler((exchange) -> {
-                            exchange.getResponseHeaders().add(Headers.CONTENT_TYPE,"text/plain");
-                            exchange.getResponseSender().send("ssl funcionando");
-                        }
-                    )
+                    .addHttpsListener(80, "0.0.0.0", sslContext)
+                    .setHandler(ProxyHandler.builder().setProxyClient(loadBalancer).build())
                     .build();
 
             server.start();
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
-        catch (NoSuchAlgorithmException ex){ ex.printStackTrace();}
-        catch (KeyManagementException ex){ ex.printStackTrace();}
-        catch(KeyStoreException ex){ex.printStackTrace();}
-        catch(CertificateException ex){ex.printStackTrace();}
-        catch(IOException ex){ex.printStackTrace();}
-        catch(UnrecoverableKeyException ex){ex.printStackTrace();}
     }
 
     private static KeyStore getKeyStore() throws KeyStoreException, IOException,
             NoSuchAlgorithmException, CertificateException{
         KeyStore keyStore = KeyStore.getInstance("JKS");
-        keyStore.load(new FileInputStream("src/main/resources/localdois"),
+        keyStore.load(new FileInputStream("src/main/resources/xkeystore.jks"),
                 "123456".toCharArray());
 
         return keyStore;
@@ -56,15 +54,15 @@ public class ReverseProxyServer {
         KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         keyManagerFactory.init(keyStore, "123456".toCharArray());
 
-        return keyManagerFactory.getKeyManagers();
-    }
+        X509ExtendedKeyManager extendedKeyManager = null;
+        for(KeyManager km : keyManagerFactory.getKeyManagers()){
+            if(km instanceof X509ExtendedKeyManager){
+                extendedKeyManager = (X509ExtendedKeyManager)km;
+            }
+        }
 
-    public static TrustManager[] getTrustManagers(KeyStore keyStore) throws NoSuchAlgorithmException, KeyStoreException{
+        XKeyManager xKeyManager = new XKeyManager(extendedKeyManager);
 
-        TrustManagerFactory trustManagerFactory = TrustManagerFactory
-                .getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        trustManagerFactory.init(keyStore);
-
-        return trustManagerFactory.getTrustManagers();
+        return new KeyManager[]{ xKeyManager};
     }
 }
